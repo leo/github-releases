@@ -6,5 +6,11 @@
     "start": "micro"
   },
   "repository": "zeit/github-releases",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "fs-extra": "3.0.1",
+    "micro": "7.3.3",
+    "request": "2.81.0",
+    "semver": "5.3.0"
+  }
 }
