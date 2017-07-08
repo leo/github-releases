@@ -1,0 +1,10 @@
+{
+  "name": "github-releases",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "start": "micro"
+  },
+  "repository": "zeit/github-releases",
+  "license": "MIT"
+}
