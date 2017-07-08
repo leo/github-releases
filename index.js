@@ -8,15 +8,21 @@ const request = require('request')
 const {valid} = require('semver')
 const {tmpdir} = require('os')
 const pipe = require('promisepipe')
+const ms = require('ms')
+const stream = require('send')
 
 const error = (res, code, message) => {
   res.statusCode = code
   res.end(message)
 }
 
-const sendCached = async (res, assetPath) => {
-  const file = fs.createReadStream(assetPath)
-  await pipe(file, res)
+const sendCached = (req, res, assetPath) => {
+  const options = {
+    maxAge: ms('1h') / 1000
+  }
+
+  res.setHeader('content-encoding', 'gzip')
+  stream(req, assetPath, options).pipe(res)
 }
 
 module.exports = async (req, res) => {
@@ -43,7 +49,7 @@ module.exports = async (req, res) => {
   const loadingPath = assetPath + '-loading'
 
   if (fs.existsSync(assetPath)) {
-    await sendCached(res, assetPath)
+    sendCached(req, res, assetPath)
     return
   }
 
@@ -55,7 +61,7 @@ module.exports = async (req, res) => {
         return
       }
 
-      sendCached(res, assetPath)
+      sendCached(req, res, assetPath)
     })
 
     return
@@ -99,6 +105,6 @@ module.exports = async (req, res) => {
     fs.renameSync(loadingPath, assetPath)
 
     // Send the cached file back to the client
-    await sendCached(res, assetPath)
+    sendCached(req, res, assetPath)
   })
 }

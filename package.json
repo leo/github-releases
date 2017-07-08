@@ -10,8 +10,10 @@
   "dependencies": {
     "fs-extra": "3.0.1",
     "micro": "7.3.3",
+    "ms": "2.0.0",
     "promisepipe": "2.0.0",
     "request": "2.81.0",
-    "semver": "5.3.0"
+    "semver": "5.3.0",
+    "send": "0.15.3"
   }
 }
