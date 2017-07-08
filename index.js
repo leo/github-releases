@@ -1,15 +1,22 @@
 // Native
 const path = require('path')
 const fs = require('fs-extra')
+const {createGzip} = require('zlib')
 
 // Packages
 const request = require('request')
 const {valid} = require('semver')
 const {tmpdir} = require('os')
+const pipe = require('promisepipe')
 
 const error = (res, code, message) => {
   res.statusCode = code
   res.end(message)
+}
+
+const sendCached = async (res, assetPath) => {
+  const file = fs.createReadStream(assetPath)
+  await pipe(file, res)
 }
 
 module.exports = async (req, res) => {
@@ -29,6 +36,31 @@ module.exports = async (req, res) => {
     return
   }
 
+  const tmpDir = tmpdir()
+
+  const versionPath = path.join(tmpDir, repo, version)
+  const assetPath = path.join(versionPath, asset)
+  const loadingPath = assetPath + '-loading'
+
+  if (fs.existsSync(assetPath)) {
+    await sendCached(res, assetPath)
+    return
+  }
+
+  // For requests that are coming in while the file
+  // is being cached, wait until it's fully saved and then respond
+  if (fs.existsSync(loadingPath)) {
+    fs.watch(loadingPath, (eventType, filename) => {
+      if (filename !== asset) {
+        return
+      }
+
+      sendCached(res, assetPath)
+    })
+
+    return
+  }
+
   const url = `https://github.com/zeit/${repo}/releases/download/${version}/${asset}`
   const assetRequest = request(url)
 
@@ -45,15 +77,6 @@ module.exports = async (req, res) => {
 
     console.log(`Caching version ${version} of ${repo} asset "${asset}"`)
 
-    const tmpDir = tmpdir()
-    const versionPath = path.join(tmpDir, repo, version)
-    const assetPath = path.join(versionPath, asset)
-
-    if (fs.existsSync(assetPath)) {
-      res.send('already there')
-      return
-    }
-
     // Create the version directory if it doesn't exist
     if (!fs.existsSync(versionPath)) {
       console.log('Wrapper directory missing. Creating it...')
@@ -66,6 +89,16 @@ module.exports = async (req, res) => {
       }
     }
 
-    res.end('ha')
+    const file = fs.createWriteStream(loadingPath)
+    const gzip = createGzip()
+
+    await pipe(assetResponse, gzip, file)
+    console.log(`Finished caching version ${version} of ${repo} asset "${asset}"`)
+
+    // Make cached file available to the public
+    fs.renameSync(loadingPath, assetPath)
+
+    // Send the cached file back to the client
+    await sendCached(res, assetPath)
   })
 }
